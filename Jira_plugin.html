@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Jira Plugin</title>
+
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #f4f6f8; }
+    
+    nav {
+      background: #0747A6;
+      color: white;
+      padding: 1em 0.5em;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      width: 220px;
+      position: fixed;
+      top: 0;
+      left: 0;
+      align-items: flex-start;
+      gap: 1em;
+    }
+
+    nav button {
+      width: 100%;
+      padding: 1em;
+      background: transparent;
+      color: white;
+      border: none;
+      cursor: pointer;
+      text-align: left;
+      font-size: 1em;
+      display: flex;
+      align-items: center;
+      gap: 0.8em;
+      transition: background 0.3s;
+    }
+
+    nav button:hover {
+      background: #0052CC;
+    }
+
+    .container {
+      margin-left: 240px;
+      padding: 2em;
+    }
+
+    .hidden { display: none; }
+
+    .popup {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #0747A6;
+      color: white;
+      padding: 1em 2em;
+      border-radius: 5px;
+      font-size: 1em;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+      display: none;
+    }
+
+    table { width: 100%; border-collapse: collapse; margin-top: 1em; }
+    th, td { border: 1px solid #ccc; padding: 0.75em; text-align: center; vertical-align: middle; }
+
+    button { 
+      padding: 0.5em 1em; 
+      margin-top: 1em; 
+      cursor: pointer; 
+      background: #0052CC; 
+      color: white; 
+      border: none; 
+      border-radius: 5px;
+    }
+
+    .btn-small {
+      padding: 0.3em 0.7em; 
+      font-size: 0.9em;
+    }
+
+    .btn-delete {
+      background: #ff4d4d;
+    }
+
+    input, select {
+      width: 100%;
+      padding: 0.5em;
+      margin-top: 0.5em;
+      box-sizing: border-box;
+    }
+
+    .action-buttons {
+      display: flex;
+      gap: 0.5em;
+      justify-content: center;
+      align-items: center;
+    }
+
+    #searchRequestModal, #createModal {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%,-50%);
+      background: white;
+      border: 1px solid #ccc;
+      padding: 2em;
+      border-radius: 8px;
+      display: none;
+      z-index: 1001;
+      width: 450px;
+      max-width: 90%;
+      overflow-y: auto;
+      max-height: 80vh;
+      box-sizing: border-box;
+    }
+
+    #searchRequestModal h3, #createModal h3 {
+      margin-top: 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    #searchRequestModal h3 button.close-btn {
+      background: transparent;
+      color: #333;
+      font-size: 1.2em;
+      border: none;
+      cursor: pointer;
+    }
+
+    .pagination {
+      display: flex;
+      justify-content: center;
+      margin-top: 1em;
+      gap: 0.5em;
+    }
+
+    .pagination button {
+      background: #0052CC;
+      color: white;
+      padding: 0.3em 0.8em;
+      border-radius: 5px;
+      border: none;
+      cursor: pointer;
+    }
+
+    .pagination button.active {
+      background: #003d99;
+    }
+
+    @media (max-width: 600px) {
+      #searchRequestModal, #createModal {
+        width: 90%;
+        padding: 1.5em;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+<nav>
+  <button onclick="showPage('home')"><i class="fas fa-home"></i> <span>Home</span></button>
+  <button onclick="showPage('config')"><i class="fas fa-file-alt"></i> <span>RD Configuration</span></button>
+  <button onclick="showPage('settings')"><i class="fas fa-cog"></i> <span>Settings</span></button>
+</nav>
+
+<div class="container">
+  <div id="home" class="page">
+    <h2>Home</h2>
+    <button onclick="openCreateModal()">+ Create Jira</button>
+    <table>
+      <thead>
+        <tr><th>Request No</th><th>Jira ID</th><th>Attachment</th></tr>
+      </thead>
+      <tbody id="homeTable"></tbody>
+    </table>
+  </div>
+
+  <div id="config" class="page hidden">
+    <h2>RD Configuration</h2>
+    <button onclick="addConfig()">+ Add Config</button>
+    <table>
+      <thead>
+        <tr><th>Request Definition</th><th>Field</th><th>Value</th><th>Actions</th></tr>
+      </thead>
+      <tbody id="configTable"></tbody>
+    </table>
+  </div>
+
+  <div id="settings" class="page hidden">
+    <h2>Settings</h2>
+    <label>Endpoint:</label><input type="text" id="domain">
+    <label>Email ID:</label><input type="email" id="email">
+    <label>Project Key:</label><input type="text" id="project">
+    <label>API Token:</label><input type="password" id="token">
+    <button onclick="testConnection()">Test Connection</button>
+  </div>
+</div>
+
+<div id="popup" class="popup"></div>
+
+<!-- Create Modal -->
+<div id="createModal" class="hidden">
+  <h3>Configuration</h3>
+  <label>Request Definition:</label>
+  <select id="rdSelect"><option disabled selected>Search and Select</option></select>
+  <button onclick="openSearchRequest()">Search Request</button>
+</div>
+
+<!-- Search Request Modal -->
+<div id="searchRequestModal" class="hidden">
+  <h3>Select Requests <button class="close-btn" onclick="closeSearchRequest()">&times;</button></h3>
+  <table>
+    <thead>
+      <tr>
+        <th><input type="checkbox" id="selectAll" onchange="toggleSelectAll(this)"></th>
+        <th>Request No</th>
+        <th>Request Name</th>
+      </tr>
+    </thead>
+    <tbody id="requestList"></tbody>
+  </table>
+  
+  <button onclick="createJiraForSelected()">Create Jira for Selected Request</button>  <!-- <-- MOVED ABOVE pagination -->
+  
+  <div class="pagination" id="pagination"></div>
+</div>
+
+<script>
+let rds = ['RD_Contract', 'RD_Supplier', 'RD_invoice'];
+let fields = ['Type and Subtype', 'Contract location', 'Contract'];
+let values = ['Procurement & Sales Agreement', 'Purchase Agreement', 'Procurement Agreement'];
+
+let allRequests = [];
+for (let i = 1; i <= 30; i++) {
+  allRequests.push({no: 'REQ-' + i, name: 'Request Name ' + i});
+}
+
+let currentPage = 1;
+const pageSize = 5;
+
+function showPage(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.add('hidden'));
+  document.getElementById(page).classList.remove('hidden');
+}
+
+function showPopup(message) {
+  const popup = document.getElementById('popup');
+  popup.textContent = message;
+  popup.style.display = 'block';
+  setTimeout(() => popup.style.display = 'none', 3000);
+}
+
+function testConnection() {
+  if (document.getElementById('domain').value && document.getElementById('email').value && document.getElementById('project').value && document.getElementById('token').value) {
+    showPopup('✅ Connection established with Jira successfully');
+  } else {
+    showPopup('Please fill all fields');
+  }
+}
+
+function addConfig() {
+  const table = document.getElementById('configTable');
+  const row = document.createElement('tr');
+
+  row.innerHTML = `
+    <td><select><option disabled selected>Search and Select</option>${rds.map(rd => `<option>${rd}</option>`).join('')}</select></td>
+    <td><select><option disabled selected>Search and Select</option>${fields.map(field => `<option>${field}</option>`).join('')}</select></td>
+    <td><select><option disabled selected>Search and Select</option>${values.map(val => `<option>${val}</option>`).join('')}</select></td>
+    <td class="action-buttons">
+      <button onclick="saveConfig(this)">Save</button>
+    </td>
+  `;
+  table.appendChild(row);
+}
+
+function saveConfig(button) {
+  const row = button.parentElement.parentElement;
+  const actionsCell = row.querySelector('.action-buttons');
+  actionsCell.innerHTML = `<button class="btn-delete" onclick="deleteConfig(this)">🗑️</button>`;
+  showPopup('✅ Configuration saved successfully');
+}
+
+function deleteConfig(button) {
+  const row = button.parentElement.parentElement;
+  row.remove();
+  showPopup('Config deleted successfully');
+}
+
+function openCreateModal() {
+  const rdSelect = document.getElementById('rdSelect');
+  rdSelect.innerHTML = `<option disabled selected>Search and Select</option>` + rds.map(rd => `<option>${rd}</option>`).join('');
+  document.getElementById('createModal').style.display = 'block';
+}
+
+function openSearchRequest() {
+  document.getElementById('createModal').style.display = 'none';
+  document.getElementById('searchRequestModal').style.display = 'block';
+  renderRequests();
+}
+
+function closeSearchRequest() {
+  document.getElementById('searchRequestModal').style.display = 'none';
+}
+
+function renderRequests() {
+  const tbody = document.getElementById('requestList');
+  const start = (currentPage - 1) * pageSize;
+  const paginatedRequests = allRequests.slice(start, start + pageSize);
+
+  tbody.innerHTML = paginatedRequests.map((req, index) => `
+    <tr>
+      <td><input type="checkbox" class="reqCheckbox" data-index="${start + index}"></td>
+      <td>${req.no}</td>
+      <td>${req.name}</td>
+    </tr>
+  `).join('');
+
+  renderPagination();
+}
+
+function renderPagination() {
+  const pageCount = Math.ceil(allRequests.length / pageSize);
+  const pagination = document.getElementById('pagination');
+
+  pagination.innerHTML = '';
+
+  for (let i = 1; i <= pageCount; i++) {
+    const btn = document.createElement('button');
+    btn.textContent = i;
+    if (i === currentPage) btn.classList.add('active');
+    btn.onclick = () => {
+      currentPage = i;
+      renderRequests();
+    };
+    pagination.appendChild(btn);
+  }
+}
+
+function toggleSelectAll(checkbox) {
+  document.querySelectorAll('.reqCheckbox').forEach(cb => cb.checked = checkbox.checked);
+}
+
+function createJiraForSelected() {
+  const selectedRequests = [...document.querySelectorAll('.reqCheckbox:checked')];
+  if (selectedRequests.length === 0) return alert('Select at least one request!');
+
+  selectedRequests.forEach(cb => {
+    const idx = cb.dataset.index;
+    const req = allRequests[idx];
+    addToHome(req.no);
+  });
+
+  closeSearchRequest();
+}
+
+function addToHome(reqNo) {
+  const table = document.getElementById('homeTable');
+  const row = document.createElement('tr');
+
+  row.innerHTML = `
+    <td>${reqNo}</td>
+    <td>Loading...</td>
+    <td><button class="btn-small" onclick="addAttachment(this)">Attach</button></td>
+  `;
+
+  table.appendChild(row);
+
+  setTimeout(() => {
+    row.children[1].textContent = 'JIRA-' + Math.floor(Math.random() * 10000);
+    showPopup('✅ Jira created successfully');
+  }, 2000);
+}
+
+function addAttachment(button) {
+  const cell = button.parentElement;
+  button.textContent = 'Loading...';
+  setTimeout(() => {
+    cell.textContent = '🔗 PDF Attached';
+    showPopup('✅ Request PDF added as attachment successfully');
+  }, 2000);
+}
+</script>
+
+</body>
+</html>
